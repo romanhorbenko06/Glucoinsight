@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>GlucoInsight прототип</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Unbounded:wght@500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+
+/* Layout: sticky scenario stepper on top, one "screen" below; doctor screens look like a MIS panel, patient screens are a phone with a side panel */
+:root{
+  --bg:#EEF3F4; --surface:#FFFFFF; --surface-2:#F5F8F9; --line:#D5DFE2;
+  --ink:#12232A; --muted:#566A72; --accent:#0B7480; --accent-ink:#FFFFFF; --accent-soft:#DDF0F1;
+  --violet:#5B45C9; --violet-soft:#ECE8FB;
+  --ok:#1D7F4E; --ok-soft:#E1F3E8; --warn:#9A6500; --warn-soft:#FBF0D9; --bad:#B23A35; --bad-soft:#FBE5E3;
+  --tube-edta:#8E6BBF; --tube-flu:#8A9299; --tube-sst:#D9A21B;
+  --chat:#E9E5F7; --phone:#1B1530; --scrim:rgba(5,10,20,.55);
+  --f-display:"Unbounded","Onest",system-ui,sans-serif;
+  --f-body:"Onest",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:12px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0E1A1F; --surface:#15252B; --surface-2:#1A2C33; --line:#2A3F47;
+  --ink:#E4EEF0; --muted:#97AAB1; --accent:#38B3BE; --accent-ink:#06191C; --accent-soft:#163B40;
+  --violet:#A493F2; --violet-soft:#2A2448;
+  --ok:#5BC98E; --ok-soft:#163626; --warn:#E6B04A; --warn-soft:#3A2E14; --bad:#F08A84; --bad-soft:#3E1D1B;
+  --chat:#2A2448; --phone:#07050D; --scrim:rgba(0,0,0,.65); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1A1F; --surface:#15252B; --surface-2:#1A2C33; --line:#2A3F47;
+  --ink:#E4EEF0; --muted:#97AAB1; --accent:#38B3BE; --accent-ink:#06191C; --accent-soft:#163B40;
+  --violet:#A493F2; --violet-soft:#2A2448;
+  --ok:#5BC98E; --ok-soft:#163626; --warn:#E6B04A; --warn-soft:#3A2E14; --bad:#F08A84; --bad-soft:#3E1D1B;
+  --chat:#2A2448; --phone:#07050D; --scrim:rgba(0,0,0,.65); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1100px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* top bar */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;flex-direction:column;gap:10px;padding-block:12px}
+.brand{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
+.logo{font-family:var(--f-display);font-weight:600;font-size:17px;letter-spacing:-.01em;display:flex;align-items:center;gap:8px}
+.logo i{width:12px;height:22px;border-radius:3px 3px 6px 6px;background:linear-gradient(var(--tube-edta) 0 30%,var(--accent-soft) 30%);border:1.5px solid var(--accent);display:inline-block}
+.brand-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.demo-tag{font-size:12px;color:var(--muted)}
+.sus-btn{border:1.5px solid var(--ok);background:var(--ok-soft);color:var(--ok);border-radius:999px;padding:5px 12px;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+.steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.step{border:1px solid var(--line);background:var(--surface-2);border-radius:10px;padding:7px 9px;text-align:left;display:flex;flex-direction:column;gap:1px;min-width:0}
+.step b{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;white-space:nowrap}
+.step span{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.step i{font-style:normal;font-size:11px;color:var(--muted)}
+.step[aria-current="step"]{border-color:var(--accent);background:var(--accent-soft)}
+.step[aria-current="step"] b{color:var(--accent)}
+.step.done b::after{content:" ✓";color:var(--ok)}
+
+main .wrap{padding-block:20px 120px}
+.screen-in{display:flex;flex-direction:column;gap:16px}
+.lead{display:flex;flex-direction:column;gap:4px;max-width:72ch}
+.lead h1{font-family:var(--f-display);font-weight:600;font-size:clamp(19px,3.2vw,26px);line-height:1.2;margin:0;text-wrap:balance;letter-spacing:-.01em}
+.lead p{margin:0;color:var(--muted)}
+.who{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.who.pat{color:var(--violet)}
+
+/* MIS panel */
+.mis{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.mis-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 14px;background:var(--surface-2);border-bottom:1px solid var(--line);font-size:13px;color:var(--muted)}
+.mis-bar strong{color:var(--ink);font-weight:600}
+.counters{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;padding:14px}
+@media (max-width:720px){.counters{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.counter{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;min-width:0}
+.counter em{font-style:normal;font-family:var(--f-mono);font-size:22px;font-variant-numeric:tabular-nums}
+.counter small{color:var(--muted);font-size:12px}
+.filters{display:flex;gap:6px;flex-wrap:wrap;padding:0 14px 12px}
+.list{display:flex;flex-direction:column}
+.row,.head-row{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1.55fr) minmax(0,1.2fr) 92px;gap:12px;align-items:center;padding:12px 14px;border-top:1px solid var(--line)}
+.row{text-align:left;background:none;border-left:0;border-right:0;border-bottom:0;width:100%}
+.row:hover{background:var(--surface-2)}
+.row.hl{background:var(--accent-soft)}
+.row[data-locked]{cursor:default}
+.row .nm{font-weight:600}
+.row .nm small,.row .why small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+.row .why{font-size:13px;min-width:0}
+.row .go{color:var(--accent);font-weight:600;font-size:13px;white-space:nowrap}
+.head-row{padding-block:8px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.empty{padding:18px 14px;border-top:1px solid var(--line);color:var(--muted);font-size:14px}
+.val{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:13px}
+.tube{display:inline-flex;align-items:center;gap:6px}
+.tube::before{content:"";width:8px;height:14px;border-radius:2px 2px 4px 4px;background:var(--cap,var(--tube-sst));flex:none}
+.pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:3px 9px;font-size:12px;font-weight:600;white-space:nowrap}
+.pill.none{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.pill.wait{background:var(--accent-soft);color:var(--accent)}
+.pill.late{background:var(--bad-soft);color:var(--bad)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+@media (max-width:720px){
+  .head-row{display:none}
+  .row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"nm go" "why why" "st st";gap:6px 10px}
+  .row .nm{grid-area:nm}.row .why{grid-area:why}.row .st{grid-area:st}.row .go{grid-area:go}
+}
+@media (max-width:620px){.step span{display:none}.step b{font-size:12px}.steps{gap:4px}.step{padding:7px 6px}}
+
+/* patient card */
+.card-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:18px;padding:16px}
+@media (max-width:820px){.card-grid{grid-template-columns:minmax(0,1fr)}}
+.block{display:flex;flex-direction:column;gap:10px;min-width:0}
+.block h3{margin:4px 0 0;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.results{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.res{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 12px;border-top:1px solid var(--line);font-size:14px}
+.res:first-child{border-top:0}
+.res .ref{color:var(--muted);font-size:12px}
+.res .r{text-align:right}
+.res .prev{display:block;color:var(--muted);font-size:12px;font-family:var(--f-mono)}
+.hi{color:var(--bad);font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:14px}
+.chip small{color:var(--muted);font-size:12px}
+.chip[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:600}
+.btn{border:0;border-radius:10px;padding:12px 16px;font-weight:600;background:var(--accent);color:var(--accent-ink);display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+.btn.sm{padding:6px 10px;font-size:13px}
+.btn.violet{background:var(--violet);color:#fff}
+.note{font-size:13px;color:var(--muted);margin:0}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;font-size:13px}
+.kv dt{color:var(--muted)}.kv dd{margin:0}
+
+/* sustainable element */
+.ethic{border:1.5px solid var(--ok);background:var(--ok-soft);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:14px}
+.ethic.no{border-color:var(--warn);background:var(--warn-soft)}
+.ethic-h{display:flex;align-items:center;gap:8px;font-weight:600;flex-wrap:wrap}
+.leaf{width:18px;height:18px;flex:none}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px}
+.cols ul,.ethic ul{margin:4px 0 0;padding-left:18px}
+.cols b{font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+.preview{background:var(--surface);border:1px dashed var(--line);border-radius:10px;padding:10px 12px;font-size:14px}
+.marker{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;border-radius:6px;padding:2px 7px;background:var(--ok);color:var(--surface);white-space:nowrap}
+.marker.fbm{background:var(--violet)}
+.roles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.roles{grid-template-columns:minmax(0,1fr)}}
+.role{border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px}
+.role b{display:block;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--accent)}
+
+/* phone */
+.patient{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:24px;align-items:start}
+@media (max-width:760px){.patient{grid-template-columns:minmax(0,1fr)}}
+.phone{background:var(--phone);border-radius:34px;padding:12px;max-width:340px;width:100%;margin:0 auto;box-shadow:0 18px 40px -20px rgba(20,10,60,.55)}
+.screen{background:var(--surface);border-radius:24px;overflow:hidden;min-height:600px;display:flex;flex-direction:column;position:relative;font-size:14px}
+.screen.big{font-size:17px}
+.screen.big .msg,.screen.big .actions button,.screen.big .opt{font-size:17px}
+.chat-top{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.chat-top .grow{flex:1;min-width:0}
+.ava{width:34px;height:34px;border-radius:50%;background:var(--violet);color:#fff;display:grid;place-items:center;font-weight:700;font-size:13px;flex:none}
+.chat-top small{display:block;color:var(--muted);font-size:11px}
+.aa{border:1px solid var(--line);background:var(--surface-2);border-radius:8px;padding:4px 8px;font-weight:700;font-size:13px}
+.aa[aria-pressed="true"]{border-color:var(--violet);color:var(--violet);background:var(--violet-soft)}
+.chat{flex:1;padding:14px;display:flex;flex-direction:column;gap:10px;background:var(--surface-2)}
+.msg{background:var(--chat);border-radius:14px 14px 14px 4px;padding:10px 12px;font-size:14px;max-width:92%}
+.msg.me{align-self:flex-end;background:var(--violet);color:#fff;border-radius:14px 14px 4px 14px}
+.msg time{display:block;font-size:11px;color:var(--muted);margin-top:4px}
+.msg.me time{color:rgba(255,255,255,.75)}
+.actions{display:flex;flex-direction:column;gap:6px}
+.actions button{border:1px solid var(--violet);background:var(--surface);color:var(--violet);border-radius:10px;padding:9px;font-weight:600;font-size:14px}
+.actions button.pri{background:var(--violet);color:#fff}
+.actions button[disabled]{opacity:.45;cursor:not-allowed}
+.slots{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.slots button{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 4px;font-family:var(--f-mono);font-size:13px}
+.slots button[aria-pressed="true"]{border-color:var(--violet);background:var(--violet-soft);color:var(--violet)}
+.slots button[disabled]{opacity:.35;text-decoration:line-through;cursor:not-allowed}
+.sheet{position:absolute;inset:auto 0 0 0;background:var(--surface);border-top:1px solid var(--line);border-radius:18px 18px 0 0;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 -10px 30px -12px rgba(0,0,0,.35)}
+.sheet h4{margin:0;font-size:15px}
+.side{display:flex;flex-direction:column;gap:12px;min-width:0}
+.app-body{flex:1;padding:14px;display:flex;flex-direction:column;gap:12px;background:var(--surface-2)}
+.app-body h4{margin:0;font-size:13px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.opt{display:flex;flex-direction:column;gap:2px;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 11px;font-size:14px;width:100%}
+.opt small{color:var(--muted);font-size:12px}
+.opt .tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:3px}
+.tag{font-size:11px;font-weight:600;border-radius:5px;padding:1px 6px;background:var(--ok-soft);color:var(--ok)}
+.opt[aria-pressed="true"]{border-color:var(--violet);background:var(--violet-soft)}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:13px}
+.check input{margin-top:3px;accent-color:var(--violet);width:16px;height:16px;flex:none}
+.prep{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px}
+.prep ul{margin:4px 0 0;padding-left:18px}
+
+/* result */
+.spark{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.spark svg{width:220px;height:84px;max-width:100%}
+.report{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+@media (max-width:620px){.report{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* quick feedback strip */
+.quick{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px dashed var(--violet);border-radius:var(--r);padding:10px 14px;background:var(--surface)}
+.quick span{font-size:14px;font-weight:500}
+.quick .chip[aria-pressed="true"]{border-color:var(--violet);background:var(--violet-soft);color:var(--violet)}
+.quick textarea{min-height:60px}
+.quick .full{flex-basis:100%;display:flex;flex-direction:column;gap:8px}
+
+/* feedback */
+.fb-fab{position:fixed;right:max(16px,calc(env(safe-area-inset-right,0px) + 16px));bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:6;border:0;border-radius:999px;background:var(--violet);color:#fff;padding:12px 18px;font-weight:600;box-shadow:0 10px 24px -10px rgba(40,20,120,.6);display:flex;align-items:center;gap:8px}
+.fb{background:var(--surface);border:1.5px solid var(--violet);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:14px}
+.fb h2{margin:0;font-family:var(--f-display);font-weight:600;font-size:18px}
+.q{display:flex;flex-direction:column;gap:6px}
+.q>label,.q>span{font-weight:600;font-size:14px}
+.stars{display:flex;gap:6px;flex-wrap:wrap}
+.stars button{width:42px;height:42px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);font-family:var(--f-mono);font-size:15px}
+.stars button[aria-pressed="true"]{background:var(--violet);border-color:var(--violet);color:#fff}
+textarea{width:100%;min-height:84px;border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit;background:var(--surface-2);color:var(--ink);resize:vertical}
+.fb .chip[aria-pressed="true"]{border-color:var(--violet);background:var(--violet-soft);color:var(--violet)}
+.thanks{display:flex;flex-direction:column;gap:6px}
+.overlay{position:fixed;inset:0;z-index:20;background:var(--scrim);display:flex;align-items:flex-end;justify-content:center;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+.overlay>.fb,.overlay>.drawer{max-width:560px;width:100%;max-height:calc(100% - 20px);overflow:auto}
+.drawer{background:var(--surface);border:1.5px solid var(--ok);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px}
+.drawer h2{margin:0;font-family:var(--f-display);font-weight:600;font-size:18px}
+.sus-list{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}
+.sus-list li{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:4px}
+.sus-list .t{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;font-weight:600}
+.sus-list .k{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ok)}
+.x{align-self:flex-end;border:0;background:none;color:var(--muted);font-size:14px;padding:0}
+@media (prefers-reduced-motion:no-preference){.screen-in{animation:in .25s ease-out}@keyframes in{from{transform:translateY(6px);opacity:.6}to{transform:none;opacity:1}}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <div class="logo"><i aria-hidden="true"></i>GlucoInsight</div>
+      <div class="brand-r">
+        <span class="demo-tag">Прототип одного сценарію · демо-дані, усі пацієнти вигадані</span>
+        <button class="sus-btn" id="susOpen" type="button" aria-haspopup="dialog"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 19c0-8 5-13 15-14-1 10-6 15-14 15"/><path d="M5 19l7-7"/></svg>Сталі елементи · 7</button>
+      </div>
+    </div>
+    <nav class="steps" id="steps" aria-label="Кроки сценарію"></nav>
+  </div>
+</header>
+
+<main><div class="wrap" id="app"></div></main>
+
+<button class="fb-fab" id="fab" type="button" aria-haspopup="dialog">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>Залишити відгук
+</button>
+<div id="modal"></div>
+
+<script>
+(function(){
+const LEAF='<svg class="leaf" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 19c0-8 5-13 15-14-1 10-6 15-14 15"/><path d="M5 19l7-7"/></svg>';
+const MARK=n=>'<span class="marker">'+LEAF.replace('class="leaf"','width="12" height="12"')+'Сталий елемент'+(n?' '+n:'')+'</span>';
+const CAP={edta:'var(--tube-edta)',flu:'var(--tube-flu)',sst:'var(--tube-sst)'};
+
+const PATIENTS=[
+ {id:'p1',name:'Ірина Мельник',age:52,flag:'HbA1c 6,2 %',sub:'предіабет',cap:'edta',last:'12.09.2026',consent:true,consentDate:'12.09.2026',channel:'Viber',
+  results:[['HbA1c','6,2 %','норма < 5,7 %',true,'03.2026 · 5,9 %'],['Глюкоза натще','5,9 ммоль/л','3,9–5,5',true,'03.2026 · 5,6'],['Холестерин загальний','5,1 ммоль/л','< 5,2',false,'03.2026 · 5,3'],['Креатинін','78 мкмоль/л','53–97',false,'']]},
+ {id:'p2',name:'Василь Ткаченко',age:47,flag:'Глюкоза натще 6,4 ммоль/л',sub:'вперше вище норми',cap:'flu',last:'03.10.2026',consent:false,
+  results:[['Глюкоза натще','6,4 ммоль/л','3,9–5,5',true,''],['Тригліцериди','2,1 ммоль/л','< 1,7',true,''],['HbA1c','не здавав','',false,'']]},
+ {id:'p3',name:'Наталія Бондар',age:58,flag:'ЛПНЩ 4,1 ммоль/л',sub:'серцево-судинний ризик',cap:'sst',last:'21.08.2026',status:'wait',until:'21.11.2026'},
+ {id:'p4',name:'Олег Савчук',age:61,flag:'рШКФ 58 мл/хв',sub:'функція нирок',cap:'sst',last:'28.06.2026',status:'late',until:'07.10.2026'},
+ {id:'p5',name:'Світлана Кравець',age:44,flag:'ТТГ 5,2 мМО/л',sub:'щитоподібна залоза',cap:'sst',last:'15.09.2026',status:'none'},
+ {id:'p6',name:'Петро Гнатюк',age:66,flag:'HbA1c 6,0 %',sub:'предіабет',cap:'edta',last:'02.07.2026',status:'out'},
+ {id:'p7',name:'Галина Литвин',age:74,flag:'Креатинін 118 мкмоль/л',sub:'нирки · виїзд додому',cap:'sst',last:'10.08.2026',status:'wait',until:'10.11.2026'}
+];
+const TERMS={1:'16.11.2026',3:'16.01.2027',6:'16.04.2027'};
+const STEPS=[['Крок 1','Список ризику','лікар'],['Крок 2','Призначити контроль','лікар'],['Крок 3','Нагадування','пацієнтка'],['Крок 4','Запис і підготовка','пацієнтка'],['Крок 5','Результат у МІС','лікар']];
+const TESTS=[['HbA1c','edta'],['Глюкоза натще','flu'],['Ліпідограма','sst'],['Креатинін, рШКФ','sst']];
+const ACC={'HbA1c':'HbA1c','Глюкоза натще':'глюкозу натще','Ліпідограма':'ліпідограму','Креатинін, рШКФ':'креатинін і рШКФ'};
+const BRANCHES=[
+ {id:'b1',name:'вул. Садова, 14',dist:'1,2 км від дому',hours:'Пн–Сб 7:00–19:00',tags:['пандус і ліфт','без черги для 65+']},
+ {id:'b2',name:'просп. Миру, 3',dist:'3,4 км',hours:'щодня 7:30–18:00',tags:['поруч зупинка тролейбуса']},
+ {id:'b3',name:'Виїзд медсестри додому',dist:'для людей з обмеженою мобільністю',hours:'за попереднім записом',tags:['вдома','за погодженням із лікарем']}
+];
+const DAYS=['Пн 11.01','Вт 12.01','Ср 13.01'];
+const SUS=[
+ ['Етика','Нагадування тільки за згодою','Без згоди пацієнта сервіс нічого не надсилає, кнопка в лікаря неактивна. Лікар може лише попросити згоду.',1,'p2'],
+ ['Етика','Мінімум даних у повідомленні','Тільки назва аналізу і строк. Без діагнозу і без цифр, тож медична таємниця не порушується навіть на чужому екрані.',1,'p1'],
+ ['Етика','Ліміт і тиша','Не більше 2 нагадувань на один строк, з 21:00 до 9:00 не пишемо, реклами в каналі немає.',1,'p1'],
+ ['Етика','Пояснення і відписка в один дотик','«Чому я це отримала?» показує, хто призначив контроль. Якщо пацієнт відписався, лікар бачить це в МІС.',2],
+ ['Соціальне','Великий шрифт і простий текст','Перемикач «Аа» робить текст більшим для людей 60+. Повідомлення написані без медичного жаргону.',2],
+ ['Соціальне','Доступний пункт або виїзд додому','Пункти з пандусом і чергою для 65+, а для маломобільних виїзд медсестри.',3],
+ ['Екологія','Один візит і результат без паперу','Аналізи з одного забору крові за один візит, менше поїздок. Результат приходить в електронному вигляді, паперовий бланк лише на прохання.',3]
+];
+
+const S={step:0,pid:'p1',filter:'all',tests:['HbA1c','Глюкоза натще'],term:3,assigned:false,
+  whySheet:false,optedOut:false,snoozed:false,big:false,consentAsked:false,
+  branch:'b1',day:'Вт 12.01',slot:null,paper:false,booked:false,nextCtl:false,
+  quick:{},fb:{rating:0,role:'',use:'',hard:'',text:'',sent:false,where:''}};
+const testsTxt=()=>{const a=S.tests.map(t=>ACC[t]);return a.length<2?a.join(''):a.slice(0,-1).join(', ')+' і '+a[a.length-1];};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const P=id=>PATIENTS.find(p=>p.id===id);
+const B=id=>BRANCHES.find(b=>b.id===id);
+const app=document.getElementById('app');
+
+function stKey(p){
+  if(p.id==='p1'){ if(S.optedOut) return 'out'; if(S.booked&&S.step===4) return 'done'; if(S.booked) return 'booked'; if(S.assigned) return 'wait'; return 'none'; }
+  if(p.id==='p2') return S.consentAsked?'consent':'none';
+  return p.status;
+}
+function statusOf(p){
+  const k=stKey(p);
+  if(p.id==='p1'&&k==='wait') return '<span class="pill wait">Контроль до '+TERMS[S.term]+'</span>';
+  if(k==='booked') return '<span class="pill wait">Записалась на '+S.day.slice(3)+'</span>';
+  if(k==='done') return '<span class="pill ok">Здано 12.01.2027</span>';
+  if(k==='out') return '<span class="pill warn">'+(p.id==='p1'?'Відписалась':'Відписався')+' від нагадувань</span>';
+  if(k==='consent') return '<span class="pill warn">Чекаємо згоду</span>';
+  if(k==='wait') return '<span class="pill wait">Контроль до '+p.until+'</span>';
+  if(k==='late') return '<span class="pill late">Не здав · строк '+p.until+'</span>';
+  return '<span class="pill none">Контроль не призначено</span>';
+}
+function counts(){
+  const c={all:PATIENTS.length,none:0,wait:0,late:0,out:0,done:0};
+  PATIENTS.forEach(p=>{const k=stKey(p); if(k==='none'||k==='consent')c.none++; else if(k==='wait'||k==='booked')c.wait++; else if(k==='late')c.late++; else if(k==='out')c.out++; else if(k==='done')c.done++;});
+  return c;
+}
+function matches(p){
+  const k=stKey(p),f=S.filter;
+  if(f==='all') return true;
+  if(f==='none') return k==='none'||k==='consent';
+  if(f==='wait') return k==='wait'||k==='booked'||k==='done';
+  return k===f;
+}
+function listView(){
+  const c=counts();
+  const F=[['all','Усі',c.all],['none','Без контролю',c.none],['wait','Контроль призначено',c.wait+c.done],['late','Прострочено',c.late],['out','Відписались',c.out]];
+  const rows=PATIENTS.filter(matches);
+  return '<div class="mis">'+
+   '<div class="mis-bar"><span>МІС · <strong>Сімейна лікарка Олена Коваль</strong> · амбулаторія №3 · 1 840 декларацій</span><span>Результати з лабораторії оновлено сьогодні о 07:40</span></div>'+
+   '<div class="counters">'+
+    '<div class="counter"><em>'+c.all+'</em><small>у зоні ризику</small></div>'+
+    '<div class="counter"><em>'+c.none+'</em><small>без контролю</small></div>'+
+    '<div class="counter"><em>'+(c.wait+c.done)+'</em><small>контроль призначено</small></div>'+
+    '<div class="counter"><em style="color:var(--bad)">'+c.late+'</em><small>не здали в строк</small></div>'+
+    '<div class="counter"><em style="color:var(--warn)">'+c.out+'</em><small>відписались</small></div></div>'+
+   '<div class="filters" role="group" aria-label="Фільтр">'+F.map(f=>'<button class="chip" type="button" data-filter="'+f[0]+'" aria-pressed="'+(S.filter===f[0])+'">'+f[1]+' <small>'+f[2]+'</small></button>').join('')+'</div>'+
+   '<div class="head-row"><span>Пацієнт</span><span>Чому в списку</span><span>Статус контролю</span><span></span></div>'+
+   '<div class="list">'+(rows.length?rows.map(p=>{
+     const open=p.id==='p1'||p.id==='p2';
+     return '<button class="row'+(p.id==='p1'&&S.step===0?' hl':'')+'" type="button" data-open="'+p.id+'"'+(open?'':' data-locked="1"')+'>'+
+      '<span class="nm">'+esc(p.name)+'<small>'+p.age+' р. · аналіз '+p.last+'</small></span>'+
+      '<span class="why"><span class="tube" style="--cap:'+CAP[p.cap]+'">'+esc(p.flag)+'</span><small>'+esc(p.sub)+'</small></span>'+
+      '<span class="st">'+statusOf(p)+'</span>'+
+      '<span class="go">'+(open?'Відкрити →':'')+'</span></button>';
+   }).join(''):'<div class="empty">У цьому фільтрі нікого немає.</div>')+'</div></div>';
+}
+
+function quickBar(){
+  const k=S.step, q=S.quick[k]||{};
+  if(q.sent) return '<div class="quick"><span>Дякуємо, відповідь про цей екран записали.</span></div>';
+  return '<div class="quick" aria-label="Швидкий відгук про екран"><span class="marker fbm">Відгук</span><span>Цей екран зрозумілий?</span>'+
+   '<button class="chip" type="button" data-quick="yes" aria-pressed="'+(q.v==='yes')+'">Так</button>'+
+   '<button class="chip" type="button" data-quick="no" aria-pressed="'+(q.v==='no')+'">Не зовсім</button>'+
+   (q.v==='no'?'<div class="full"><textarea id="quickText" placeholder="Що саме незрозуміло на цьому екрані?">'+esc(q.text||'')+'</textarea><button class="btn violet sm" type="button" id="quickSend" style="align-self:flex-start">Надіслати</button></div>':'')+
+   '</div>';
+}
+
+function render(){
+  document.getElementById('steps').innerHTML=STEPS.map((s,i)=>
+    '<button class="step'+(i<S.step?' done':'')+'" type="button" data-step="'+i+'"'+(i===S.step?' aria-current="step"':'')+'><b>'+s[0]+'</b><span>'+s[1]+'</span><i>'+s[2]+'</i></button>').join('');
+  const h=[step1,step2,step3,step4,step5][S.step]();
+  app.innerHTML='<div class="screen-in">'+h+(S.step<4?quickBar():'')+'</div>';
+  try{location.replace('#s'+(S.step+1))}catch(e){}
+}
+function go(n){S.step=n;S.whySheet=false;render();scrollTo(0,0);}
+
+function step1(){
+  return '<div class="lead"><span class="who">Сімейний лікар · МІС</span><h1>Хто з моїх пацієнтів у зоні ризику</h1>'+
+   '<p>Список збирається сам із результатів лабораторії: діабет, ліпіди, нирки, щитоподібна залоза. Лікарка нічого не вводить вручну. Вона бачить, кому потрібен повторний аналіз, хто його вже здав і хто відписався від нагадувань.</p></div>'+
+   listView()+'<p class="note">Почніть з Ірини Мельник. Василь Ткаченко показує, що буває, коли пацієнт не дав згоди на нагадування. Фільтри вгорі списку працюють.</p>';
+}
+
+function step2(){
+  const p=P(S.pid), can=p.consent;
+  const msg='Олена Коваль, ваша сімейна лікарка, рекомендує повторно здати <b>'+esc(testsTxt()||'…')+'</b> до <b>'+TERMS[S.term]+'</b>. Записатися можна тут.';
+  const oneVisit=S.tests.length>1;
+  return '<div class="lead"><span class="who">Сімейний лікар · картка пацієнта</span><h1>'+esc(p.name)+', '+p.age+' р.</h1>'+
+   '<p>Лікарка обирає аналіз і строк. Нагадування, запис і повернення результату бере на себе сервіс.</p></div>'+
+   '<div class="mis"><div class="mis-bar"><span>Результати з лабораторії · '+p.last+'</span><button class="btn ghost sm" type="button" data-step="0">← До списку</button></div>'+
+   '<div class="card-grid">'+
+    '<div class="block"><h3>Результати і попереднє значення</h3><div class="results">'+p.results.map(r=>
+      '<div class="res"><span>'+r[0]+(r[2]?'<br><span class="ref">'+r[2]+'</span>':'')+'</span><span class="r"><span class="val'+(r[3]?' hi':'')+'">'+r[1]+'</span>'+(r[4]?'<span class="prev">'+r[4]+'</span>':'')+'</span></div>').join('')+'</div>'+
+     '<h3>Що здати повторно</h3><div class="chips">'+TESTS.map(t=>
+       '<button class="chip" type="button" data-test="'+t[0]+'" aria-pressed="'+S.tests.includes(t[0])+'"><span class="tube" style="--cap:'+CAP[t[1]]+'">'+t[0]+'</span></button>').join('')+'</div>'+
+     '<h3>Строк</h3><div class="chips">'+[1,3,6].map(m=>
+       '<button class="chip" type="button" data-term="'+m+'" aria-pressed="'+(S.term===m)+'">'+m+' міс · до '+TERMS[m]+'</button>').join('')+'</div>'+
+     '<p class="note">Підказка: при HbA1c 5,7–6,4 % повторний контроль зазвичай через 3 місяці. Остаточне рішення за лікаркою.</p>'+
+     (oneVisit?'<div class="ethic"><div class="ethic-h">'+LEAF+'Усе за один візит '+MARK()+'</div><div>Обрані аналізи беруть з одного забору крові. Пацієнтці не треба їхати двічі, а лабораторія не друкує окремі направлення.</div></div>':'')+
+     '<h3>Хто за що відповідає</h3><div class="roles"><div class="role"><b>Лікарка</b>призначення і висновок</div><div class="role"><b>Лабораторія</b>нагадування, запис, аналіз</div><div class="role"><b>Сервіс</b>передає дані між ними</div></div>'+
+    '</div>'+
+    '<div class="block">'+
+     (can?
+      '<div class="ethic"><div class="ethic-h">'+LEAF+'Є згода пацієнтки на нагадування '+MARK()+'</div>'+
+      '<div>Згоду дала в лабораторії '+p.consentDate+', канал обрала сама: '+p.channel+'. Може відписатися одним натисканням.</div>'+
+      '<div class="cols"><div><b>Піде в повідомлення</b><ul><li>назва аналізу</li><li>строк</li><li>посилання на запис</li></ul></div>'+
+      '<div><b>Не піде</b><ul><li>діагноз</li><li>значення аналізів</li><li>назва хвороби</li></ul></div></div></div>'+
+      '<h3>Пацієнтка побачить</h3><div class="preview">'+msg+'</div>'+
+      '<div class="ethic"><div class="ethic-h">'+LEAF+'Правила нагадувань '+MARK()+'</div><ul><li>за 7 днів до строку і повторно в день строку, не більше 2 разів</li><li>з 21:00 до 9:00 не пишемо</li><li>реклами в цьому каналі немає</li></ul></div>'+
+      '<button class="btn" type="button" id="assign"'+(S.tests.length?'':' disabled')+'>Призначити контроль і нагадати</button>'
+     :
+      '<div class="ethic no"><div class="ethic-h">'+LEAF+'Немає згоди на нагадування '+MARK()+'</div>'+
+      '<div>Без згоди сервіс нічого не надсилає пацієнту. Лікарка може попросити згоду: пацієнт отримає одне SMS із запитом і сам вирішить.</div></div>'+
+      '<button class="btn" type="button" disabled>Призначити контроль і нагадати</button>'+
+      (S.consentAsked?'<p class="note"><b>Запит на згоду надіслано.</b> Поки пацієнт не відповість, нагадувань не буде. У списку він має статус «Чекаємо згоду».</p>':
+       '<button class="btn ghost" type="button" id="askConsent">Попросити згоду в пацієнта</button>')+
+      '<p class="note">Повернутися до основного сценарію: <button class="chip" type="button" data-open="p1">Ірина Мельник</button></p>')+
+    '</div></div></div>';
+}
+
+function phoneTop(sub){
+  return '<div class="chat-top"><div class="ava">Л</div><div class="grow"><b>Лабораторія</b><small>'+sub+'</small></div>'+
+   '<button class="aa" type="button" id="bigText" aria-pressed="'+S.big+'" aria-label="Великий шрифт">Аа</button></div>';
+}
+
+function step3(){
+  let chat='<div class="msg"><b>Нагадування про аналіз</b><br>Добрий день, Ірино! Ваша сімейна лікарка Олена Коваль рекомендує повторно здати '+esc(testsTxt())+' до '+TERMS[S.term]+'. Повторний аналіз покаже, чи змінився рівень цукру після першого результату.<time>09.01.2027, 10:00</time></div>';
+  let act='';
+  if(S.optedOut){
+    chat+='<div class="msg me">Відписатися<time>10:02</time></div><div class="msg">Готово, нагадувань більше не буде. Лікарка побачить це і зможе зв’язатися з вами сама.<time>10:02</time></div>';
+    act='<div class="actions"><button type="button" id="undoOpt">Повернути нагадування</button><button type="button" data-step="4">Що бачить лікарка →</button></div>';
+  } else if(S.snoozed){
+    chat+='<div class="msg me">Нагадати пізніше<time>10:01</time></div><div class="msg">Добре, нагадаємо ще раз 16.01 о 10:00. Це буде останнє нагадування про цей аналіз.<time>10:01</time></div>';
+    act='<div class="actions"><button class="pri" type="button" data-step="3">Все ж записатися зараз</button></div>';
+  } else {
+    act='<div class="actions"><button class="pri" type="button" data-step="3">Записатися</button><button type="button" id="snooze">Нагадати пізніше</button><button type="button" id="why">Чому я це отримала?</button></div>';
+  }
+  const sheet=S.whySheet?'<div class="sheet" role="dialog" aria-label="Чому я отримала нагадування"><h4>Чому ви отримали це повідомлення</h4>'+
+    '<div>Контроль призначила ваша лікарка Олена Коваль. Ви погодились на нагадування 12.09.2026, коли здавали аналізи.</div>'+
+    '<div>Ми передаємо лише назву аналізу і строк. Результати бачите тільки ви і ваша лікарка. Реклами в цьому чаті немає.</div>'+
+    '<div class="actions"><button type="button" id="closeWhy">Зрозуміло</button><button type="button" id="optOut" style="border-color:var(--bad);color:var(--bad)">Відписатися від нагадувань</button></div></div>':'';
+  return '<div class="lead"><span class="who pat">Пацієнтка · Viber</span><h1>Ірина отримує зрозуміле нагадування</h1>'+
+   '<p>Без діагнозу і без цифр: що здати, до коли і навіщо. Можна записатися, відкласти, дізнатися, чому прийшло повідомлення, або відписатися.</p></div>'+
+   '<div class="patient"><div class="phone"><div class="screen'+(S.big?' big':'')+'">'+phoneTop('нагадування за вашою згодою')+
+    '<div class="chat">'+chat+act+'</div>'+sheet+'</div></div>'+
+   '<div class="side">'+
+    '<div class="ethic"><div class="ethic-h">'+LEAF+'Пояснення і відписка '+MARK()+'</div><div>Пацієнтка бачить, хто призначив контроль і чому їй пишуть. Відписка займає одне натискання, і лікарка про неї дізнається.</div></div>'+
+    '<div class="ethic"><div class="ethic-h">'+LEAF+'Великий шрифт і простий текст '+MARK()+'</div><div>Кнопка «Аа» у верхньому куті телефону збільшує текст. Повідомлення написані без медичних термінів, бо багатьом пацієнтам понад 60.</div></div>'+
+    '<div class="ethic"><div class="ethic-h">'+LEAF+'Без спаму '+MARK()+'</div><div>«Нагадати пізніше» відкладає повідомлення, але не більше одного разу. Більше двох нагадувань на строк сервіс не надсилає.</div></div>'+
+    '<p class="note">Спробуйте «Чому я це отримала?» і кнопку «Аа».</p></div></div>';
+}
+
+function step4(){
+  const br=B(S.branch);
+  let body;
+  if(S.booked){
+    body='<div class="chat">'+
+     '<div class="msg me">Записатися · '+S.day+', '+S.slot+'<time>10:03</time></div>'+
+     '<div class="msg"><b>Запис підтверджено</b><br>'+S.day+', '+S.slot+' · '+esc(br.name)+'.<br>Приходьте натще: останній прийом їжі за 8–12 годин, воду пити можна.<br>'+(S.paper?'Паперовий бланк підготуємо на пункті.':'Результат прийде сюди і одразу до вашої лікарки, папір не потрібен.')+'<time>10:03</time></div>'+
+     '<div class="actions"><button type="button" id="rebook">Змінити час</button><button class="pri" type="button" data-step="4">Ірина здала аналіз → Крок 5</button></div></div>';
+  } else {
+    const slots=['07:30','08:00','08:30','09:15','10:00','11:30'];
+    const busy={'Пн 11.01':['07:30','08:00'],'Вт 12.01':['08:30'],'Ср 13.01':['09:15','10:00']}[S.day]||[];
+    body='<div class="app-body">'+
+     '<h4>Де здати</h4>'+BRANCHES.map(b=>'<button class="opt" type="button" data-branch="'+b.id+'" aria-pressed="'+(S.branch===b.id)+'"><b>'+esc(b.name)+'</b><small>'+esc(b.dist)+' · '+esc(b.hours)+'</small><span class="tags">'+b.tags.map(t=>'<span class="tag">'+esc(t)+'</span>').join('')+'</span></button>').join('')+
+     '<h4>Коли</h4><div class="chips">'+DAYS.map(d=>'<button class="chip" type="button" data-day="'+d+'" aria-pressed="'+(S.day===d)+'">'+d+'</button>').join('')+'</div>'+
+     '<div class="slots">'+slots.map(t=>'<button type="button" data-slot="'+t+'" aria-pressed="'+(S.slot===t)+'"'+(busy.includes(t)?' disabled':'')+'>'+t+'</button>').join('')+'</div>'+
+     '<div class="prep"><b>Як підготуватися</b><ul><li>натще 8–12 годин, воду пити можна</li><li>ліки приймайте, як радила лікарка</li><li>займе близько 10 хвилин</li></ul></div>'+
+     '<label class="check"><input type="checkbox" id="paper"'+(S.paper?' checked':'')+'><span>Мені потрібен паперовий бланк результату. Без позначки результат прийде сюди і до лікарки.</span></label>'+
+     '<div class="actions"><button class="pri" type="button" id="book"'+(S.slot?'':' disabled')+'>'+(S.slot?'Записатися на '+S.day+', '+S.slot:'Оберіть час')+'</button></div></div>';
+  }
+  return '<div class="lead"><span class="who pat">Пацієнтка · запис</span><h1>Запис займає хвилину</h1>'+
+   '<p>Ірина обирає найближчий пункт або виїзд додому, день і час, читає, як підготуватися, і вирішує, чи потрібен їй папір.</p></div>'+
+   '<div class="patient"><div class="phone"><div class="screen'+(S.big?' big':'')+'">'+phoneTop('запис на аналіз')+body+'</div></div>'+
+   '<div class="side">'+
+    '<div class="ethic"><div class="ethic-h">'+LEAF+'Доступний пункт або виїзд додому '+MARK()+'</div><div>Біля кожного пункту видно, чи є пандус і черга без поспіху для 65+. Людям, яким важко дістатися, пропонуємо виїзд медсестри.</div></div>'+
+    '<div class="ethic"><div class="ethic-h">'+LEAF+'Результат без паперу '+MARK()+'</div><div>За замовчуванням результат електронний: у телефоні пацієнтки і в МІС лікарки. Бланк друкують лише на прохання, тому паперу і поїздок за ним стає менше.</div></div>'+
+   '</div></div>';
+}
+
+function step5(){
+  const fbBlock=feedbackForm('inline');
+  if(S.optedOut){
+    return '<div class="lead"><span class="who">Сімейний лікар · МІС</span><h1>Лікарка бачить, що Ірина відписалася</h1><p>Сервіс більше не пише пацієнтці. Лікарка вирішує, чи зателефонувати самій.</p></div>'+listView()+fbBlock;
+  }
+  if(!S.booked){
+    return '<div class="lead"><span class="who">Сімейний лікар · МІС</span><h1>Ірина ще не записалась</h1><p>Поверніться на крок 4 і запишіться, щоб побачити, як результат приходить у МІС.</p></div>'+
+     '<button class="btn" type="button" data-step="3" style="align-self:flex-start">← До запису</button>'+listView()+fbBlock;
+  }
+  return '<div class="lead"><span class="who">Сімейний лікар · МІС</span><h1>Результат прийшов у картку сам</h1>'+
+   '<p>Лабораторія передала результат у МІС. Лікарка бачить динаміку, може одразу призначити наступний контроль і бачить, хто ще не здав.</p></div>'+
+   '<div class="mis"><div class="mis-bar"><span><strong>Ірина Мельник</strong> · повторний контроль</span><span class="pill ok">Здано 12.01.2027, вчасно</span></div>'+
+   '<div class="card-grid"><div class="block"><h3>HbA1c, динаміка</h3><div class="spark">'+
+    '<svg viewBox="0 0 220 84" role="img" aria-label="HbA1c: 5,9 у березні 2026, 6,2 у вересні 2026, 5,9 у січні 2027"><line x1="10" y1="60" x2="210" y2="60" stroke="var(--line)" stroke-dasharray="3 3"/>'+
+    '<text x="10" y="75" font-size="9" fill="var(--muted)">поріг 5,7 %</text>'+
+    '<polyline points="25,42 115,16 200,42" fill="none" stroke="var(--accent)" stroke-width="2.5"/>'+
+    '<circle cx="25" cy="42" r="4" fill="var(--muted)"/><circle cx="115" cy="16" r="4" fill="var(--bad)"/><circle cx="200" cy="42" r="5" fill="var(--accent)"/>'+
+    '<text x="25" y="34" font-size="9" fill="var(--muted)" text-anchor="middle">03.26</text><text x="115" y="10" font-size="9" fill="var(--muted)" text-anchor="middle">09.26</text><text x="200" y="34" font-size="9" fill="var(--muted)" text-anchor="middle">01.27</text></svg>'+
+    '<div><div class="val">03.2026 · 5,9 %</div><div class="val">09.2026 · 6,2 %</div><div class="val" style="font-size:16px;color:var(--accent)">01.2027 · 5,9 %</div></div></div>'+
+    '<dl class="kv"><dt>Глюкоза натще</dt><dd class="val">5,6 ммоль/л</dd><dt>Пункт</dt><dd>'+esc(B(S.branch).name)+'</dd><dt>Бланк</dt><dd>'+(S.paper?'паперовий, на прохання пацієнтки':'електронний, без друку')+'</dd></dl>'+
+    '<p class="note">Демо-значення. Рішення про лікування ухвалює лікарка, сервіс діагнозів не ставить.</p></div>'+
+   '<div class="block"><h3>Пацієнтка отримала</h3><div class="preview">Ваш результат готовий і вже в лікарки Олени Коваль. Обговоріть його на прийомі або в повідомленні лікарці.</div>'+
+    '<div class="ethic"><div class="ethic-h">'+LEAF+'Без автоматичної розшифровки '+MARK()+'</div><div>Сервіс не каже пацієнтці «добре» чи «погано». Пояснює результат лікарка, тож людина не лишається сам на сам із цифрами.</div></div>'+
+    '<h3>Наступний контроль</h3>'+(S.nextCtl?'<p class="note"><b>Призначено:</b> HbA1c до 16.07.2027. Нагадування прийде так само, за згодою.</p>':
+     '<button class="btn ghost" type="button" id="nextCtl" style="align-self:flex-start">Призначити HbA1c через 6 міс</button>')+
+   '</div></div></div>'+
+   '<div class="mis"><div class="mis-bar"><span><strong>Звіт для лікарки</strong> · жовтень 2026 – січень 2027</span><span>приходить щомісяця</span></div>'+
+    '<div class="counters" style="grid-template-columns:repeat(4,minmax(0,1fr))"><div class="counter"><em>'+(S.nextCtl?24:23)+'</em><small>контролів призначено</small></div><div class="counter"><em>17</em><small>здали вчасно</small></div><div class="counter"><em style="color:var(--bad)">4</em><small>не здали</small></div><div class="counter"><em style="color:var(--ok)">15</em><small>результатів без паперу</small></div></div>'+
+    '<p class="note" style="padding:0 14px 14px">Демо-цифри для прикладу.</p></div>'+
+   listView()+fbBlock;
+}
+
+function feedbackForm(where){
+  const f=S.fb;
+  if(f.sent) return '<section class="fb"><div class="thanks"><h2>Дякуємо за відгук</h2><p class="note">'+esc(f.where)+'</p>'+
+    '<button class="btn ghost" type="button" id="fbAgain" style="align-self:flex-start">Залишити ще один</button></div></section>';
+  return '<section class="fb" aria-label="Форма відгуку">'+
+   (where==='modal'?'<button class="x" type="button" id="fbClose">Закрити ✕</button>':'')+
+   '<div><span class="marker fbm">Форма фідбеку</span><h2 style="margin-top:8px">Як вам цей сценарій?</h2><p class="note" style="margin-top:4px">П’ять питань, до хвилини. Відгук прив’язується до кроку, на якому ви зараз.</p></div>'+
+   '<div class="q"><span id="q1">Наскільки зрозуміло, як працює сервіс?</span><div class="stars" role="group" aria-labelledby="q1">'+[1,2,3,4,5].map(n=>
+     '<button type="button" data-rate="'+n+'" aria-pressed="'+(f.rating===n)+'" aria-label="'+n+' з 5">'+n+'</button>').join('')+'</div><span class="note" style="font-weight:400">1 — нічого не зрозуміло, 5 — усе ясно</span></div>'+
+   '<div class="q"><span id="q2">Хто ви?</span><div class="chips" role="group" aria-labelledby="q2">'+['Лікар','Пацієнт','Лабораторія','Інше'].map(r=>
+     '<button class="chip" type="button" data-role="'+r+'" aria-pressed="'+(f.role===r)+'">'+r+'</button>').join('')+'</div></div>'+
+   '<div class="q"><span id="q3">Чи користувались би ви таким сервісом?</span><div class="chips" role="group" aria-labelledby="q3">'+['Так','Можливо','Ні'].map(r=>
+     '<button class="chip" type="button" data-use="'+r+'" aria-pressed="'+(f.use===r)+'">'+r+'</button>').join('')+'</div></div>'+
+   '<div class="q"><span id="q4">Який крок найменш зрозумілий?</span><div class="chips" role="group" aria-labelledby="q4">'+STEPS.map((s,i)=>s[0]).concat(['Усе ясно']).map(r=>
+     '<button class="chip" type="button" data-hard="'+r+'" aria-pressed="'+(f.hard===r)+'">'+r+'</button>').join('')+'</div></div>'+
+   '<div class="q"><label for="fbText">Що заважало б або чого бракує?</label><textarea id="fbText" placeholder="Наприклад: хочу бачити ще…">'+esc(f.text)+'</textarea></div>'+
+   '<button class="btn violet" type="button" id="fbSend"'+(f.rating?'':' disabled')+'>Надіслати відгук</button></section>';
+}
+
+function susDrawer(){
+  return '<div class="drawer"><button class="x" type="button" id="modalClose">Закрити ✕</button>'+
+   '<h2>Сталі елементи в прототипі</h2><p class="note">Кожен з них змінює те, що бачить лікар або пацієнт. Натисніть «Показати», щоб перейти до екрана.</p>'+
+   '<ul class="sus-list">'+SUS.map((s,i)=>'<li><span class="k">'+s[0]+'</span><span class="t">'+s[1]+'</span><span class="note">'+s[2]+'</span><button class="btn ghost sm" type="button" data-sus="'+i+'" style="align-self:flex-start">Показати · крок '+(s[3]+1)+'</button></li>').join('')+'</ul></div>';
+}
+
+function openModal(kind){document.getElementById('modal').innerHTML='<div class="overlay" role="dialog" aria-modal="true" aria-label="'+(kind==='sus'?'Сталі елементи':'Відгук')+'" data-kind="'+kind+'">'+(kind==='sus'?susDrawer():feedbackForm('modal'))+'</div>';}
+function closeModal(){document.getElementById('modal').innerHTML='';}
+function refreshFb(){ const o=document.querySelector('#modal .overlay'); if(o&&o.dataset.kind==='fb') openModal('fb'); if(S.step===4) render(); }
+
+let dbP=null; function getDb(){ if(!dbP){ dbP=(window.claude&&window.claude.use)?window.claude.use('db').catch(()=>null):Promise.resolve(null);} return dbP;}
+async function store(rec){
+  let saved=false;
+  try{ const db=await Promise.race([getDb(),new Promise(r=>setTimeout(()=>r(null),4000))]); if(db){ const u=await window.claude.use('user'); const id=u&&await u.id(); if(id){ await db.collection('feedback/'+id+'/items').add(rec); saved=true; } } }catch(e){ saved=false; }
+  if(!saved){ try{ const k='gi-feedback'; const a=JSON.parse(localStorage.getItem(k)||'[]'); a.push(rec); localStorage.setItem(k,JSON.stringify(a)); }catch(e){} }
+  return saved;
+}
+async function sendFb(){
+  const f=S.fb; const t=document.getElementById('fbText'); if(t) f.text=t.value.slice(0,2000);
+  const saved=await store({kind:'form',rating:f.rating,role:f.role||'—',wouldUse:f.use||'—',hardestStep:f.hard||'—',comment:f.text,step:STEPS[S.step][1],at:new Date().toISOString()});
+  f.sent=true; f.where=saved?'Відгук збережено, команда його прочитає.':'Відгук прийнято.';
+  refreshFb();
+}
+async function sendQuick(v,text){
+  const k=S.step; S.quick[k]={v,text,sent:true}; render();
+  await store({kind:'quick',screen:STEPS[k][1],clear:v,comment:text||'',at:new Date().toISOString()});
+}
+
+document.addEventListener('input',e=>{
+  if(e.target.id==='fbText') S.fb.text=e.target.value;
+  if(e.target.id==='quickText'){ const q=S.quick[S.step]||(S.quick[S.step]={}); q.text=e.target.value; }
+});
+document.addEventListener('change',e=>{ if(e.target.id==='paper'){ S.paper=e.target.checked; } });
+document.addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  const d=b.dataset;
+  if(b.id==='fab'){openModal('fb');return;}
+  if(b.id==='susOpen'){openModal('sus');return;}
+  if(b.id==='fbClose'||b.id==='modalClose'){closeModal();return;}
+  if(d.sus!==undefined){const s=SUS[+d.sus]; closeModal(); if(s[4]){S.pid=s[4];} if(s[3]>=2&&!S.assigned){S.assigned=true;S.pid='p1';} if(s[3]===2){S.whySheet=false;} go(s[3]); return;}
+  if(d.rate){S.fb.rating=+d.rate;refreshFb();return;}
+  if(d.role){S.fb.role=d.role;refreshFb();return;}
+  if(d.use){S.fb.use=d.use;refreshFb();return;}
+  if(d.hard){S.fb.hard=d.hard;refreshFb();return;}
+  if(b.id==='fbSend'){b.disabled=true;sendFb();return;}
+  if(b.id==='fbAgain'){S.fb={rating:0,role:'',use:'',hard:'',text:'',sent:false,where:''};refreshFb();return;}
+  if(d.quick){ if(d.quick==='yes'){sendQuick('yes');} else { S.quick[S.step]=Object.assign(S.quick[S.step]||{},{v:'no'}); render(); } return;}
+  if(b.id==='quickSend'){ const t=document.getElementById('quickText'); sendQuick('no',t?t.value.slice(0,1000):''); return;}
+  if(d.step!==undefined){ const n=+d.step; if(n>=2&&!S.assigned){S.assigned=true;S.pid='p1';} go(n); return;}
+  if(d.filter){S.filter=d.filter;render();return;}
+  if(d.open){ if(d.locked){ return; } S.pid=d.open; go(1); return;}
+  if(d.test){const i=S.tests.indexOf(d.test); i<0?S.tests.push(d.test):S.tests.splice(i,1); render(); return;}
+  if(d.term){S.term=+d.term;render();return;}
+  if(b.id==='assign'){S.assigned=true;S.pid='p1';go(2);return;}
+  if(b.id==='askConsent'){S.consentAsked=true;render();return;}
+  if(b.id==='bigText'){S.big=!S.big;render();return;}
+  if(b.id==='snooze'){S.snoozed=true;render();return;}
+  if(b.id==='why'){S.whySheet=true;render();return;}
+  if(b.id==='closeWhy'){S.whySheet=false;render();return;}
+  if(b.id==='optOut'){S.optedOut=true;S.whySheet=false;render();return;}
+  if(b.id==='undoOpt'){S.optedOut=false;S.snoozed=false;render();return;}
+  if(d.branch){S.branch=d.branch;render();return;}
+  if(d.day){S.day=d.day;S.slot=null;render();return;}
+  if(d.slot){S.slot=d.slot;render();return;}
+  if(b.id==='book'){S.booked=true;render();return;}
+  if(b.id==='rebook'){S.booked=false;render();return;}
+  if(b.id==='nextCtl'){S.nextCtl=true;render();return;}
+});
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
+
+const m=/^#s([1-5])$/.exec(location.hash||'');
+if(m){ S.step=+m[1]-1; if(S.step>=2){S.assigned=true;} if(S.step===4){S.slot='08:00';S.booked=true;} }
+render();
+})();
+</script>
+</body>
+</html>
