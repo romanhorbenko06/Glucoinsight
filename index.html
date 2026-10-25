@@ -224,6 +224,10 @@ textarea{width:100%;min-height:84px;border:1px solid var(--line);border-radius:1
 .sus-list .t{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;font-weight:600}
 .sus-list .k{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ok)}
 .x{align-self:flex-end;border:0;background:none;color:var(--muted);font-size:14px;padding:0}
+.msg .trust{display:flex;gap:6px;align-items:flex-start;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);font-size:.86em;color:var(--ok)}
+.msg .trust svg{flex:none;margin-top:2px}
+.consent{position:fixed;left:12px;right:12px;bottom:12px;z-index:60;max-width:640px;margin:0 auto;background:var(--surface);color:inherit;border:1px solid var(--line);border-radius:14px;box-shadow:0 8px 28px rgba(0,0,0,.18);padding:14px 16px;display:flex;flex-direction:column;gap:10px;font-size:14px}
+.consent p{margin:0}.consent-b{display:flex;gap:8px;flex-wrap:wrap}
 @media (prefers-reduced-motion:no-preference){.screen-in{animation:in .25s ease-out}@keyframes in{from{transform:translateY(6px);opacity:.6}to{transform:none;opacity:1}}}
 </style>
 </head>
@@ -250,6 +254,63 @@ textarea{width:100%;min-height:84px;border:1px solid var(--line);border-radius:1
 
 <script>
 (function(){
+/* ===== Модуль 4: A/B-тест і аналітика =====
+   Вставте сюди URL веб-застосунку Apps Script (закінчується на /exec). */
+const GAS_URL='https://script.google.com/macros/s/AKfycbyK8Zq6SQApsNN6P03FVl_i5nGL70Tf3XSxO9G-d8GBj1ILL270u_WUnxObr_vLRW1cCA/exec';
+const QS=new URLSearchParams(location.search);
+const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+const rid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
+if(QS.get('test')==='1') ls.set('gi-internal','1');
+if(QS.get('test')==='0') ls.set('gi-internal','0');
+const INTERNAL=ls.get('gi-internal')==='1';
+let VARIANT=(QS.get('v')||'').toUpperCase();
+if(VARIANT!=='A'&&VARIANT!=='B') VARIANT=ls.get('gi-variant');
+if(VARIANT!=='A'&&VARIANT!=='B') VARIANT=Math.random()<0.5?'A':'B';
+ls.set('gi-variant',VARIANT);
+let UID=ls.get('gi-uid'); if(!UID){UID=rid();ls.set('gi-uid',UID);}
+const SID=rid(), SRC=(QS.get('src')||'direct').slice(0,40);
+const DEVICE=matchMedia('(pointer:coarse)').matches?'mobile':'desktop';
+if(QS.get('consent')==='reset') try{localStorage.removeItem('gi-consent')}catch(e){}
+let CONSENT=ls.get('gi-consent');
+/* банер згоди на аналітику: до згоди події лише чекають у пам'яті, при відмові видаляються */
+function consentBanner(){
+  if(CONSENT==='yes'||CONSENT==='no') return;
+  const d=document.createElement('div'); d.className='consent'; d.setAttribute('role','region'); d.setAttribute('aria-label','Згода на аналітику');
+  d.innerHTML='<p><b>Анонімна статистика для навчального тесту.</b> Ми рахуємо, які кроки ви відкриваєте і на що натискаєте, щоб покращити прототип. Без імені, телефону, email і IP-адреси. Можна відмовитися, прототип працюватиме так само.</p>'+
+    '<div class="consent-b"><button type="button" class="btn sm" id="cYes">Погоджуюсь</button><button type="button" class="btn ghost sm" id="cNo">Відмовитися</button></div>';
+  document.body.appendChild(d);
+  d.addEventListener('click',e=>{ const id=e.target.id; if(id!=='cYes'&&id!=='cNo') return; e.stopPropagation();
+    CONSENT=id==='cYes'?'yes':'no'; ls.set('gi-consent',CONSENT); d.remove(); flush(); });
+}
+const T0=Date.now(); let Q=[], maxStep=0, nClicks=0;
+function track(type,o){
+  o=o||{};
+  Q.push({ts:new Date().toISOString(),uid:UID,sid:SID,variant:VARIANT,internal:INTERNAL?1:0,src:SRC,device:DEVICE,
+    type:type,step:o.step!=null?o.step:curStep+1,label:o.label||'',value:o.value!=null?String(o.value).slice(0,2000):'',ms:o.ms||'',data:o.data||null});
+  if(Q.length>=20) flush();
+}
+function flush(final){
+  if(CONSENT==='no'){ Q=[]; return; }
+  if(CONSENT!=='yes'){ if(Q.length>300) Q=Q.slice(-300); return; }
+  if(!Q.length) return; const batch=Q; Q=[];
+  if(!/^https:\/\/script\.google\.com\//.test(GAS_URL)){ try{const a=JSON.parse(ls.get('gi-events')||'[]').concat(batch).slice(-500);ls.set('gi-events',JSON.stringify(a));}catch(e){} return; }
+  const body=JSON.stringify({events:batch});
+  try{ fetch(GAS_URL,{method:'POST',mode:'no-cors',keepalive:body.length<60000,headers:{'Content-Type':'text/plain;charset=utf-8'},body:body}).catch(()=>{}); }
+  catch(e){ try{navigator.sendBeacon&&navigator.sendBeacon(GAS_URL,body);}catch(_){} }
+}
+setInterval(flush,5000);
+let ended=false;
+function endSession(){ if(ended) return; ended=true; leaveStep(); track('session_end',{ms:Date.now()-T0,value:maxStep,label:'clicks:'+nClicks}); flush(true); }
+addEventListener('pagehide',endSession);
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden'){ leaveStep(); track('hidden',{ms:Date.now()-T0}); flush(true);} else { stepT=Date.now(); ended=false; } });
+let curStep=-1, stepT=Date.now();
+function leaveStep(){ if(curStep>=0){ track('step_time',{step:curStep+1,ms:Date.now()-stepT}); stepT=Date.now(); } }
+function enterStep(n){ if(n===curStep) return; leaveStep(); curStep=n; stepT=Date.now(); maxStep=Math.max(maxStep,n+1); track('step_view',{step:n+1}); }
+/* сталі елементи: які кнопки/дії відповідають якому елементу (індекс у SUS) */
+const SUS_ACT={why:3,optOut:3,bigText:4,askConsent:0};
+track('session_start',{step:1,label:document.referrer?new URL(document.referrer).hostname:'',value:innerWidth+'x'+innerHeight,data:{lang:navigator.language}});
+if(document.body) consentBanner(); else addEventListener('DOMContentLoaded',consentBanner);
+/* ===== кінець блоку аналітики ===== */
 const LEAF='<svg class="leaf" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 19c0-8 5-13 15-14-1 10-6 15-14 15"/><path d="M5 19l7-7"/></svg>';
 const MARK=n=>'<span class="marker">'+LEAF.replace('class="leaf"','width="12" height="12"')+'Сталий елемент'+(n?' '+n:'')+'</span>';
 const CAP={edta:'var(--tube-edta)',flu:'var(--tube-flu)',sst:'var(--tube-sst)'};
@@ -288,7 +349,7 @@ const SUS=[
 const S={step:0,pid:'p1',filter:'all',tests:['HbA1c','Глюкоза натще'],term:3,assigned:false,
   whySheet:false,optedOut:false,snoozed:false,big:false,consentAsked:false,
   branch:'b1',day:'Вт 12.01',slot:null,paper:false,booked:false,nextCtl:false,
-  quick:{},fb:{rating:0,role:'',use:'',hard:'',text:'',sent:false,where:''}};
+  quick:{},fb:{rating:0,role:'',use:'',hard:'',sus:0,pmf:'',text:'',sent:false,where:''}};
 const testsTxt=()=>{const a=S.tests.map(t=>ACC[t]);return a.length<2?a.join(''):a.slice(0,-1).join(', ')+' і '+a[a.length-1];};
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const P=id=>PATIENTS.find(p=>p.id===id);
@@ -362,6 +423,7 @@ function render(){
     '<button class="step'+(i<S.step?' done':'')+'" type="button" data-step="'+i+'"'+(i===S.step?' aria-current="step"':'')+'><b>'+s[0]+'</b><span>'+s[1]+'</span><i>'+s[2]+'</i></button>').join('');
   const h=[step1,step2,step3,step4,step5][S.step]();
   app.innerHTML='<div class="screen-in">'+h+(S.step<4?quickBar():'')+'</div>';
+  enterStep(S.step);
   try{location.replace('#s'+(S.step+1))}catch(e){}
 }
 function go(n){S.step=n;S.whySheet=false;render();scrollTo(0,0);}
@@ -415,7 +477,7 @@ function phoneTop(sub){
 }
 
 function step3(){
-  let chat='<div class="msg"><b>Нагадування про аналіз</b><br>Добрий день, Ірино! Ваша сімейна лікарка Олена Коваль рекомендує повторно здати '+esc(testsTxt())+' до '+TERMS[S.term]+'. Повторний аналіз покаже, чи змінився рівень цукру після першого результату.<time>09.01.2027, 10:00</time></div>';
+  let chat='<div class="msg"><b>Нагадування про аналіз</b><br>Добрий день, Ірино! Ваша сімейна лікарка Олена Коваль рекомендує повторно здати '+esc(testsTxt())+' до '+TERMS[S.term]+'. Повторний аналіз покаже, чи змінився рівень цукру після першого результату.'+(VARIANT==='B'?'<span class="trust">'+LEAF.replace('class="leaf"','width="12" height="12"')+'Ми не надсилаємо діагноз і результати аналізів, лише назву аналізу і строк. Відписатися можна одним натисканням.</span>':'')+'<time>09.01.2027, 10:00</time></div>';
   let act='';
   if(S.optedOut){
     chat+='<div class="msg me">Відписатися<time>10:02</time></div><div class="msg">Готово, нагадувань більше не буде. Лікарка побачить це і зможе зв’язатися з вами сама.<time>10:02</time></div>';
@@ -507,15 +569,19 @@ function feedbackForm(where){
     '<button class="btn ghost" type="button" id="fbAgain" style="align-self:flex-start">Залишити ще один</button></div></section>';
   return '<section class="fb" aria-label="Форма відгуку">'+
    (where==='modal'?'<button class="x" type="button" id="fbClose">Закрити ✕</button>':'')+
-   '<div><span class="marker fbm">Форма фідбеку</span><h2 style="margin-top:8px">Як вам цей сценарій?</h2><p class="note" style="margin-top:4px">П’ять питань, до хвилини. Відгук прив’язується до кроку, на якому ви зараз.</p></div>'+
+   '<div><span class="marker fbm">Форма фідбеку</span><h2 style="margin-top:8px">Як вам цей сценарій?</h2><p class="note" style="margin-top:4px">Сім коротких питань, до хвилини. Відгук прив’язується до кроку, на якому ви зараз. Він анонімний: не вказуйте ім’я, телефон чи дані про своє здоров’я.</p></div>'+
    '<div class="q"><span id="q1">Наскільки зрозуміло, як працює сервіс?</span><div class="stars" role="group" aria-labelledby="q1">'+[1,2,3,4,5].map(n=>
      '<button type="button" data-rate="'+n+'" aria-pressed="'+(f.rating===n)+'" aria-label="'+n+' з 5">'+n+'</button>').join('')+'</div><span class="note" style="font-weight:400">1 — нічого не зрозуміло, 5 — усе ясно</span></div>'+
    '<div class="q"><span id="q2">Хто ви?</span><div class="chips" role="group" aria-labelledby="q2">'+['Лікар','Пацієнт','Лабораторія','Інше'].map(r=>
      '<button class="chip" type="button" data-role="'+r+'" aria-pressed="'+(f.role===r)+'">'+r+'</button>').join('')+'</div></div>'+
    '<div class="q"><span id="q3">Чи користувались би ви таким сервісом?</span><div class="chips" role="group" aria-labelledby="q3">'+['Так','Можливо','Ні'].map(r=>
      '<button class="chip" type="button" data-use="'+r+'" aria-pressed="'+(f.use===r)+'">'+r+'</button>').join('')+'</div></div>'+
+   '<div class="q"><span id="q6">Як би ви почувались, якби такого сервісу не стало?</span><div class="chips" role="group" aria-labelledby="q6">'+['Дуже розчарований','Трохи розчарований','Не розчарований'].map(r=>
+     '<button class="chip" type="button" data-pmf="'+r+'" aria-pressed="'+(f.pmf===r)+'">'+r+'</button>').join('')+'</div></div>'+
    '<div class="q"><span id="q4">Який крок найменш зрозумілий?</span><div class="chips" role="group" aria-labelledby="q4">'+STEPS.map((s,i)=>s[0]).concat(['Усе ясно']).map(r=>
      '<button class="chip" type="button" data-hard="'+r+'" aria-pressed="'+(f.hard===r)+'">'+r+'</button>').join('')+'</div></div>'+
+   '<div class="q"><span id="q5">Наскільки для вас важливі сталі елементи: згода, мінімум даних, доступність, без паперу?</span><div class="stars" role="group" aria-labelledby="q5">'+[1,2,3,4,5].map(n=>
+     '<button type="button" data-susrate="'+n+'" aria-pressed="'+(f.sus===n)+'" aria-label="'+n+' з 5">'+n+'</button>').join('')+'</div><span class="note" style="font-weight:400">1 — не важливо, 5 — дуже важливо</span></div>'+
    '<div class="q"><label for="fbText">Що заважало б або чого бракує?</label><textarea id="fbText" placeholder="Наприклад: хочу бачити ще…">'+esc(f.text)+'</textarea></div>'+
    '<button class="btn violet" type="button" id="fbSend"'+(f.rating?'':' disabled')+'>Надіслати відгук</button></section>';
 }
@@ -539,12 +605,15 @@ async function store(rec){
 }
 async function sendFb(){
   const f=S.fb; const t=document.getElementById('fbText'); if(t) f.text=t.value.slice(0,2000);
-  const saved=await store({kind:'form',rating:f.rating,role:f.role||'—',wouldUse:f.use||'—',hardestStep:f.hard||'—',comment:f.text,step:STEPS[S.step][1],at:new Date().toISOString()});
+  const rec={kind:'form',rating:f.rating,role:f.role||'—',wouldUse:f.use||'—',hardestStep:f.hard||'—',susImportance:f.sus||'',disappointed:f.pmf||'—',comment:f.text,step:STEPS[S.step][1],at:new Date().toISOString()};
+  track('feedback_form',{label:'form',value:f.text,data:rec}); flush();
+  const saved=await store(rec);
   f.sent=true; f.where=saved?'Відгук збережено, команда його прочитає.':'Відгук прийнято.';
   refreshFb();
 }
 async function sendQuick(v,text){
   const k=S.step; S.quick[k]={v,text,sent:true}; render();
+  track('feedback_quick',{step:k+1,label:v,value:text||'',data:{kind:'quick',clear:v,comment:text||''}}); flush();
   await store({kind:'quick',screen:STEPS[k][1],clear:v,comment:text||'',at:new Date().toISOString()});
 }
 
@@ -552,10 +621,19 @@ document.addEventListener('input',e=>{
   if(e.target.id==='fbText') S.fb.text=e.target.value;
   if(e.target.id==='quickText'){ const q=S.quick[S.step]||(S.quick[S.step]={}); q.text=e.target.value; }
 });
-document.addEventListener('change',e=>{ if(e.target.id==='paper'){ S.paper=e.target.checked; } });
+document.addEventListener('change',e=>{ if(e.target.id==='paper'){ S.paper=e.target.checked; track('click',{label:'paper:'+(S.paper?'on':'off')}); } });
 document.addEventListener('click',e=>{
   const b=e.target.closest('button'); if(!b) return;
   const d=b.dataset;
+  { nClicks++; const k=Object.keys(d)[0]; const lbl=b.id||(k?k+':'+d[k]:'button');
+    track('click',{label:lbl,value:(b.textContent||'').trim().slice(0,60)});
+    if(S.step===2&&!S.optedOut&&(d.step==='3'||b.id==='snooze'||b.id==='why'||b.id==='optOut')) track('reminder_action',{label:d.step==='3'?'book':b.id});
+    const si=SUS_ACT[b.id]!=null?SUS_ACT[b.id]:(d.branch==='b3'?5:null);
+    if(si!=null) track('sus_use',{label:SUS[si][1],value:si});
+    if(b.id==='susOpen') track('sus_open');
+    if(d.sus!==undefined) track('sus_show',{label:SUS[+d.sus][1],value:d.sus});
+    if(b.id==='book') track('booked',{label:S.branch,value:S.paper?'paper':'paperless'});
+  }
   if(b.id==='fab'){openModal('fb');return;}
   if(b.id==='susOpen'){openModal('sus');return;}
   if(b.id==='fbClose'||b.id==='modalClose'){closeModal();return;}
@@ -564,8 +642,10 @@ document.addEventListener('click',e=>{
   if(d.role){S.fb.role=d.role;refreshFb();return;}
   if(d.use){S.fb.use=d.use;refreshFb();return;}
   if(d.hard){S.fb.hard=d.hard;refreshFb();return;}
+  if(d.susrate){S.fb.sus=+d.susrate;refreshFb();return;}
+  if(d.pmf){S.fb.pmf=d.pmf;refreshFb();return;}
   if(b.id==='fbSend'){b.disabled=true;sendFb();return;}
-  if(b.id==='fbAgain'){S.fb={rating:0,role:'',use:'',hard:'',text:'',sent:false,where:''};refreshFb();return;}
+  if(b.id==='fbAgain'){S.fb={rating:0,role:'',use:'',hard:'',sus:0,pmf:'',text:'',sent:false,where:''};refreshFb();return;}
   if(d.quick){ if(d.quick==='yes'){sendQuick('yes');} else { S.quick[S.step]=Object.assign(S.quick[S.step]||{},{v:'no'}); render(); } return;}
   if(b.id==='quickSend'){ const t=document.getElementById('quickText'); sendQuick('no',t?t.value.slice(0,1000):''); return;}
   if(d.step!==undefined){ const n=+d.step; if(n>=2&&!S.assigned){S.assigned=true;S.pid='p1';} go(n); return;}
